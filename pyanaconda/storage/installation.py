@@ -25,6 +25,7 @@ from gi.repository import BlockDev as blockdev
 from blivet import util as blivet_util, arch
 from blivet.errors import FSResizeError, FormatResizeError
 
+from pyanaconda.core import util
 from pyanaconda.core.configuration.anaconda import conf
 from pyanaconda.errors import errorHandler as error_handler, ERROR_RAISE
 from pyanaconda.modules.common.constants.objects import FCOE, ZFCP, ISCSI
@@ -198,10 +199,16 @@ def _write_dasd_conf(storage, sysroot):
     if not (arch.is_s390() and dasds):
         return
 
-    with open(os.path.realpath(sysroot + "/etc/dasd.conf"), "w") as f:
+    # make sure empty dasd.conf exists, dracut needs it
+    open(os.path.realpath(sysroot + "/etc/dasd.conf"), "w").close()
+
+    # zdev
+    # - (done) dasd-eckd must be replaced by /sys/bus/ccw/devices/<busid>/driver
+    # - must handle options
+    with open(os.path.realpath(sysroot + "/etc/zdev.conf"), "a") as f:
         for dasd in dasds:
-            fields = [dasd.busid] + dasd.get_opts()
-            f.write("%s\n" % " ".join(fields),)
+            driver = os.path.basename(os.path.realpath("/sys/bus/ccw/devices/%s/driver" % dasd.busid))
+            f.write("[persistent %s %s]\nonline=1\n\n" % (driver, dasd.busid))
 
     # check for hyper PAV aliases; they need to get added to dasd.conf as well
     sysfs = "/sys/bus/ccw/drivers/dasd-eckd"
@@ -216,7 +223,7 @@ def _write_dasd_conf(storage, sysroot):
     # checking for a very specific flag, so there won't be any duplicate entries
     # in dasd.conf
     devs = [d for d in os.listdir(sysfs) if d.startswith("0.0")]
-    with open(os.path.realpath(sysroot + "/etc/dasd.conf"), "a") as f:
+    with open(os.path.realpath(sysroot + "/etc/zdev.conf"), "a") as f:
         for d in devs:
             aliasfile = "%s/%s/alias" % (sysfs, d)
             with open(aliasfile, "r") as falias:
@@ -226,4 +233,4 @@ def _write_dasd_conf(storage, sysroot):
             # normal dasd (alias == 0) and we can skip it, since it will have
             # been added to dasd.conf in the above block of code
             if alias == "1":
-                f.write("%s\n" % d)
+                f.write("[persistent dasd-eckd %s]\nonline=1\n\n" % d)

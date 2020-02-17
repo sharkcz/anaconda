@@ -145,6 +145,12 @@ def _prepare_configuration(storage, payload, ksdata):
 
     # Initramfs generation
     generate_initramfs = TaskQueue("Initramfs generation", N_("Generating initramfs"))
+
+    # Generate persistent device configuration on s390x (#1802482)
+    if arch.is_s390() and not conf.target.is_directory:
+        generate_initramfs.append(Task("Generate persistent device configuration",
+            lambda: util.execInSysroot("chzdev", ["--import", "/etc/zdev.conf", "--yes", "--no-root-update", "--force"])))
+
     generate_initramfs.append(Task("Generate initramfs", payload.recreate_initrds))
 
     # This works around 2 problems, /boot on BTRFS and BTRFS installations where the initrd is
