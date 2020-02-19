@@ -208,7 +208,10 @@ def _write_dasd_conf(storage, sysroot):
     with open(os.path.realpath(sysroot + "/etc/zdev.conf"), "a") as f:
         for dasd in dasds:
             driver = os.path.basename(os.path.realpath("/sys/bus/ccw/devices/%s/driver" % dasd.busid))
-            f.write("[persistent %s %s]\nonline=1\n\n" % (driver, dasd.busid))
+            f.write("[persistent %s %s]\nonline=1\n" % (driver, dasd.busid))
+            for opt in dasd.get_opts():
+                f.write("%s\n" % opt)
+            f.write("\n")
 
     # check for hyper PAV aliases; they need to get added to dasd.conf as well
     sysfs = "/sys/bus/ccw/drivers/dasd-eckd"
